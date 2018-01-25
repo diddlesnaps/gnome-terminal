@@ -1,0 +1,225 @@
+name: gnome-terminal
+version: '3.26.2'
+summary: Gnome Terminal
+description: Gnome Terminal
+
+grade: stable
+confinement: classic
+
+apps:
+  gnome-terminal:
+    command: bin/desktop-launch $SNAP/usr/bin/gnome-terminal
+    desktop: usr/share/applications/org.gnome.Terminal.desktop
+
+parts:
+  gnome-platform:
+    plugin: nil
+    prepare: |
+      echo "deb http://ppa.launchpad.net/ubuntu-desktop/gnome-3-26/ubuntu xenial main" | tee /etc/apt/sources.list.d/gnome-3-26.list
+      apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 399B698EEA9EF163B6F9A0F62CC98497A1231595
+      apt update
+      apt upgrade -yy
+
+  harfbuzz:
+    after: [gnome-platform]
+    plugin: autotools
+    source: https://github.com/behdad/harfbuzz/releases/download/1.6.3/harfbuzz-1.6.3.tar.bz2
+    configflags:
+      - --prefix=/usr
+      - --sysconfdir=/etc
+      - --without-cairo
+      - --with-graphite2
+      - --with-glib
+      - --with-gobject
+      - --with-icu
+      - --enable-introspection
+    build-packages:
+      - gettext
+      - gobject-introspection
+      - libgirepository1.0-dev
+      - libglib2.0-dev
+      - libgraphite2-dev
+      - libicu-dev
+    stage-packages:
+      - gobject-introspection
+      - libgirepository-1.0-1
+      - libglib2.0-0
+      - libgraphite2-3
+      - libicu55
+    prime:
+      - usr/lib/libharfbuzz*
+      - usr/share/locale/*
+    build-attributes: [no-system-libraries]
+
+  freetype:
+    after: [harfbuzz]
+    plugin: autotools
+    source: https://download.savannah.gnu.org/releases/freetype/freetype-2.8.1.tar.bz2
+    configflags:
+      - --prefix=/usr
+      - --sysconfdir=/etc
+      - --disable-static
+    build-packages:
+      - gettext
+      - libbz2-dev
+      - libpng12-dev
+      - zlib1g-dev
+    stage-packages:
+      - libbz2-1.0
+      - libpng12-0
+      - zlib1g
+    prime:
+      - etc/fonts/*
+      - usr/lib/libfreetype*
+      - usr/share/locale/*
+    build-attributes: [no-system-libraries]
+
+  fontconfig:
+    after: [freetype]
+    plugin: autotools
+    source: https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.12.6.tar.bz2
+    configflags:
+      - --prefix=/snap/gnome-terminal/current/usr
+      - --sysconfdir=/snap/gnome-terminal/current/etc
+      - --enable-iconv
+    build-packages:
+      - gettext
+      - gperf
+      - libexpat1-dev
+      - libxml2-dev
+    stage-packages:
+      - gperf
+      - libexpat1
+      - libxml2
+    organize:
+      snap/gnome-terminal/current/usr: usr
+      snap/gnome-terminal/current/etc: etc
+    install: |
+      find $SNAPCRAFT_PART_INSTALL/snap/gnome-terminal/current/usr/lib/pkgconfig -name "*.pc" -exec \
+        sed -i "s|snap/gnome-terminal/current/||g" '{}' \;
+    prime:
+      - etc/fonts
+      - usr/bin/fc-*
+      - usr/lib/libfontconfig*
+      - usr/share/fontconfig
+      - usr/share/locale/*
+    build-attributes: [no-system-libraries]
+
+  cairo:
+    after: [fontconfig]
+    plugin: autotools
+    source: http://cairographics.org/snapshots/cairo-1.15.8.tar.xz
+    configflags:
+      - --prefix=/usr
+    build-packages:
+      - gettext
+      - libegl1-mesa-dev
+      - libgl1-mesa-dev
+      - libpng12-dev
+      - libwayland-dev
+      - libx11-dev
+      - libxcb-shm0-dev
+      - libxcb1-dev
+    stage-packages:
+      - libegl1-mesa
+      - libgl1
+      - libpng12-0
+      - libwayland-client0
+      - libx11-6
+      - libxcb-shm0
+      - libxcb1
+    prime:
+      - usr/lib/cairo/*
+      - usr/lib/libcairo*
+      - usr/share/locale/*
+    build-attributes: [no-system-libraries]
+
+  pango:
+    after: [cairo, fontconfig]
+    plugin: autotools
+    source: git://git.gnome.org/pango
+    source-tag: '1.40.14'
+    source-depth: 1
+    configflags:
+      - --prefix=/usr
+    build-packages:
+      - gettext
+      - gobject-introspection
+      - gtk-doc-tools
+      - libgirepository1.0-dev
+      - libglib2.0-dev
+      - libwayland-dev
+      - libx11-dev
+      - libxft-dev
+      - libxrender-dev
+    stage-packages:
+      - gobject-introspection
+      - libgirepository-1.0-1
+      - libglib2.0-0
+      - libwayland-client0
+      - libx11-6
+      - libxft2
+      - libxrender1
+    prime:
+      - usr/lib/girepository-1.0/Pango*.typelib
+      - usr/lib/libpango*
+      - usr/share/locale/*
+    build-attributes: [no-system-libraries]
+
+  libvte:
+    after: [gnome-platform, cairo, pango]
+    plugin: autotools
+    source: git://git.gnome.org/vte
+    source-tag: '0.50.2'
+    source-depth: 1
+    configflags:
+      - --prefix=/usr
+      - --disable-glade
+    build-packages:
+      - gettext
+      - gobject-introspection
+      - intltool
+      - libglib2.0-dev
+      - libgnutls-dev
+      - libgtk-3-dev
+      - libncurses5-dev
+      - libpcre2-dev
+      - libx11-dev
+      - python-all-dev
+    stage-packages:
+      - gobject-introspection
+      - libglib2.0-0
+      - libgnutls30
+      - libgtk-3-0
+      - libncurses5
+      - libpcre2-8-0
+      - libx11-6
+    build-attributes: [no-system-libraries]
+
+  gnome-terminal:
+    after: [gnome-platform, cairo, pango, libvte, desktop-glib-only]
+    plugin: autotools
+    source: git://git.gnome.org/gnome-terminal
+    source-tag: '3.26.2'
+    source-depth: 1
+    configflags:
+      - --prefix=/usr
+      - --disable-migration
+      - --disable-search-provider
+      - --without-nautilus-extension
+    build-packages:
+      - desktop-file-utils
+      - gnome-common
+      - gsettings-desktop-schemas-dev
+      - intltool
+      - libdconf-dev
+      - libgconf2-dev
+      - libglib2.0-dev
+      - libgtk-3-dev
+      - libnautilus-extension-dev
+      - libsm-dev
+      - libx11-dev
+      - uuid-dev
+      - valac
+      - yelp-tools
+    build-attributes: [no-system-libraries]
